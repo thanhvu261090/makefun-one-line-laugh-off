@@ -57,13 +57,24 @@ def self_test():
     """
     assert gate_check(ENTRY) is True
     assert len(ENTRY) == 111, f"entry length changed: {len(ENTRY)}"
+    stats = entry_stats(ENTRY)
+    assert stats == {"chars": 111, "words": 22, "non_ascii": 1}, (
+        f"entry shape changed: {stats}"
+    )
+    assert validate_utf8(ENTRY) == ENTRY.encode("utf-8")
+    assert len(validate_utf8(ENTRY)) == 113, "entry byte length changed"
     bad_cases = [
         ("", "empty entry"),
         (" " * 10, "whitespace-only entry"),
         ("x" * 201, "entry over 200 characters"),
         ("two\nlines", "multi-line entry"),
+        ("two\rlines", "carriage-return entry"),
         (" padded ", "entry with surrounding whitespace"),
+        ("trailing ", "trailing-space entry"),
+        (" leading", "leading-space entry"),
         (123, "non-string entry"),
+        (None, "none entry"),
+        (b"bytes", "bytes entry"),
     ]
     for bad_text, label in bad_cases:
         try:
@@ -74,11 +85,36 @@ def self_test():
     return True
 
 
-def main():
+def write_entry(path):
+    """Write the validated entry to path, exactly as-is, no trailing newline.
+
+    The caller picks the path (the grader reads /output/entry.txt); the
+    bytes written are exactly ENTRY encoded as UTF-8, so the judge sees
+    the line and nothing else.
+    """
     gate_check(ENTRY)
-    os.makedirs("/output", exist_ok=True)
-    with open("/output/entry.txt", "w", encoding="utf-8", newline="") as f:
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="") as f:
         f.write(ENTRY)
+    return path
+
+
+def entry_stats(text):
+    """Count the entry's characters, words and non-ASCII characters.
+
+    Used by the self-test to pin the entry's shape: a later edit that
+    changes the joke changes these numbers and fails loudly instead of
+    silently submitting a different line.
+    """
+    return {
+        "chars": len(text),
+        "words": len(text.split()),
+        "non_ascii": sum(1 for ch in text if ord(ch) > 127),
+    }
+
+
+def main():
+    write_entry("/output/entry.txt")
 
 
 if __name__ == "__main__":
